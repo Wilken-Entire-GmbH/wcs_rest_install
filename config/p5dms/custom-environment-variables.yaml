@@ -1,0 +1,26 @@
+server:
+  swagger:
+    enable: WDS_SWAGGERUI_ENABLE
+    stats: WDS_SWAGGERSTATS
+  authorization:
+    systemPassword: WDS_SYSTEMPASSWORD
+metric:
+  enabled: WDS_METRIC_ENABLE
+  tenantid: WDS_TENANTID
+retrieval:
+  url: RETRIEVAL_URL
+context:
+  WCS3Rest: 
+    application: 
+      title: TENANT_CAPTION
+    server: 
+      http: 
+        port: WDSREST_HTTP_PORT 
+      soap:
+        url: WDSREST_SOAP_URL 
+        log: WDSREST_SOAP_LOG 
+      soapConfig:
+        url: WDSREST_SOAPCONFIG_URL 
+        log: WDSREST_SOAPCONFIG_LOG
+    propertyStore: 
+      path: WDSREST_PROPERTYSTORE_PATH 

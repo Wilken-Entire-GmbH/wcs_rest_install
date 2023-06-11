@@ -1,0 +1,58 @@
+server:
+  log: 
+    severity: debug
+    # serviceName: GlobalService # if empty uses context name
+    transports:
+      DailyRotateFile:
+        active: true
+        options:
+          datePattern: YYYY-MM-DD # rotate daily
+          dirname: logs # dirname from 
+          # filename:     # if empty => uses serviceName
+          extension: .log
+          maxSize: 20m    # max size of file is 20mb
+          maxFiles: 14d   #delete files after 14 days
+      Console:
+        active: false   
+  swagger:
+    enable: true
+    file: assets/openapi.yaml
+    uipath: /api-docs
+    stats: true
+  authorization:
+    enable: false
+    certAuth: false
+    systemPassword: f7bfd3b813d09aa8b62ff49d3094adaa7187da2b79f1bd6c7d5b4663ed962d6d
+    login: 
+      - auth: basic 
+    access:
+      auth: basic
+  bindProtocol: ['http']
+services:
+  retrieval: 
+    url: 'http://localhost:8080'
+context:
+  WCS3Rest: 
+    application: 
+      title: WCS3 Contentservice REST
+    server: 
+      http: 
+        port: 8030
+      soap:
+        url: 'http://127.0.0.1:8030/soap/ContentService'
+        log: true
+      soapConfig:
+        url: 'http://127.0.0.1:8030/soap/ContentConfigurationService'
+        log: false
+    propertyStore:
+      path: ./store.json
+    wcsData:
+      location: backend.wcs
+    viewer:
+      serverURL: null
+      forwardURL: null
+    config: 
+      file: wcs3rest/config.yaml
+      restConnector: d3
+    metric: 
+      subtitle: 'Content Service Rest'

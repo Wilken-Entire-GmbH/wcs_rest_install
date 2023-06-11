@@ -1,0 +1,310 @@
+Connectors:
+  d3: 
+    defaults:
+      repositoryId: 27cc8f0e-c069-5b05-99de-46bc77968723
+      mapping: 
+        toD3:
+          DocumentId: property_document_id
+          docType: property_category
+    baseUrl: 'https://dmstest.kvhessen.de'
+    authorization: 
+      type: Bearer 
+      options:
+        key: 1XRYGVx61xAWOJVtt95sIYT8lFBZUoBYfDASBMDdNbeXLQFtN0eHHgue/BShwgx0Dz281Pq2nGvxYxsYq+N+ZSHGm3+v9Qy+HqIuUN3Qvx+Qz6P3tjf2xUUDMNNBs4F4&_z_A0V5ayCQBERg_iP8nq_sWPgilPGKvBsEolQb-HjyHRTPt6iAhENl-spNKGaegiUHHd0aCsyOAXosMgfZ4I5CdBInE5qGg  
+    connection:
+      type: D3
+      options: {}
+    mappings: 
+      p5dmsToWCS: |
+        (
+          $main := data.backend.wcs.{
+            "DocumentId": DocumentId,
+            "mimeType": mimeType,
+            "filename": filename,
+            "creationDate": creationDate
+          }; 
+
+          $merge([ 
+            { "dmsId": id}, 
+            $main,
+            { "properties": $keys(data.backend.wcs)[$not( $ in $keys($main))].{ "key": $, "value": $lookup($$.data.backend.wcs, $) } }
+          ])      
+        )
+      d3SearchToWCS: |
+        (
+          $convertStamp := function($stamp) { $toMillis($stamp) ~> $fromMillis('[M01]-[D01]-[Y0001] [H01]:[m01]:[s01]', '+0200') };
+
+          $.(
+            $filename := displayProperties[id = "property_filename"].value; 
+            $extension := displayProperties[id = "property_filetype"].value;
+            $docType := { "key": "docType", "value": category.id };
+            $main := {
+              "DocumentId": id,
+              "mimeType": mimeType,
+              "filename": $filename ? $filename : id & "." & $extension,
+              "creationDate": $convertStamp(created) 
+            }; 
+    
+            $merge([$main,
+              {
+                "properties": $append(
+                  $docType,
+                  displayProperties.{
+                    "key": id,
+                    "value": dataType = 3 ? $convertStamp(value) : value 
+                  })
+              }
+            ])
+          )
+        )
+      d3DetailsToWCS: |
+        (
+          $convertStamp := function($stamp) { $toMillis($stamp) ~> $fromMillis('[Y0001]-[M01]-[D01] [H01]:[m01]:[s01]', '+0200') };
+
+          $.(
+            $filename := systemProperties[id = "property_filename"].value; 
+            $extension := systemProperties[id = "property_filetype"].value;
+            $docType := { "key": "docType", "value": systemProperties[id = "property_category"].value };
+            $main := {
+                "DocumentId": property_document_id,
+                "mimeType": mimeType,
+                "filename": $filename ? $filename : id & "." & $extension,
+                "creationDate": $convertStamp(systemProperties[id = "property_creation_date"].value) 
+            }; 
+            
+            $merge([
+                $main,
+                {
+                    "properties": $append(
+                        $docType,
+                        objectProperties.{
+                            "key": id, 
+                            "value": dataType = 3 ? $convertStamp(value) : value 
+                        }
+                        ) ~> $append(systemProperties.{
+                            "key": id,
+                            "value": dataType = 3 ? $convertStamp(value) : value 
+                        })
+                }
+            ])
+          )
+        )
+
+    wcsMethods:  
+      test: 
+        invoke:
+          request: 
+            url: /dms/r 
+          transform: |
+            = 
+            {
+                "message": "Repositories: " & $join(response.data.repositories.( $format("%s=%s",name,id) ), ", ")
+            }
+      searchContent:
+        invoke:
+          request: 
+            url: = $format("/dms/r/%s/sr", _defaults.repositoryId)
+            params: |
+              = (
+                  $soap := ($ ~> | soap.query.property | ( 
+                    $key := $lookup($$._defaults.mapping.toD3,key); 
+                    { "key": $key ? $key : key }
+                  ) |).soap;
+    
+                  $defs := [ $soap.query.property[key = 'property_category'].value]; 
+                  $props := [ $soap.query.property[key != 'property_category'].{ key: [value] } ]; 
+
+                  {
+                    "objectdefinitionids": $count($defs) > 0 ? "" & $defs,
+                    "properties": $count($props) > 0 ? "" & $merge($props)
+                  }
+    
+                )              
+          transform: = response.data.items
+          mapping: d3SearchToWCS
+          errors: 
+            - condition: = response.status >= 400
+              code: = response.status 
+              message: = response.statusText & (response.data.details ? " - " & response.data.details)
+            
+      getContentDescription: 
+        invoke:
+          request: 
+            url: = $format("/dms/r/%s/o2/%s", _defaults.repositoryId, soap.DocumentId)
+          transform: = response.data
+          mapping: d3DetailsToWCS
+          errors:
+            - condition: = response.status = 404
+              code: = response.status 
+              message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+            - condition: = response.status >= 400
+              code: = response.status 
+              message: = response.statusText
+
+      getContentData: 
+        invoke: 
+          - request: 
+              url: = $format("/dms/r/%s/o2/%s/preview",_defaults.repositoryId,soap.DocumentId)
+            transform: |
+              = {
+                  "href": response.data.pdfInlineUri
+                } 
+            storeAs: props 
+            errors:
+              - condition: = response.status = 404
+                code: = response.status 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+              - condition: = response.status >= 400
+                code: = response.status 
+                message: = response.statusText
+          - request: 
+              url: = props.href
+              params: {} 
+              options: 
+                responseType: buffer
+            transform: 
+              contentType: = $lookup(response.headers,'content-type')
+              buffer: = response.data
+            errors: 
+              - condition: = response.status >= 400
+                code: = response.status 
+                message: = response.statusText
+
+      updateProperties: 
+        invoke: 
+          - request: 
+             url: = $format("/dms/r/%s/o2/%s", _defaults.repositoryId, soap.DocumentId)
+            transform: |
+              = {
+               "category": response.data.systemProperties[id = "property_category"].value
+              } 
+            storeAs: ref
+          - request:
+             method: put 
+             headers: 
+               Origin: https://dmstest.kvhessen.de
+             url: = $format("/dms/r/%s/o2/%s", _defaults.repositoryId, soap.DocumentId)
+             body: |
+               = {
+                 "sourceCategory": ref.category,
+                 "sourceId": $format("/dms/r/%s/source", _defaults.repositoryId), 
+                 "sourceProperties": {
+                    "properties": [soap.contentProperties.( {"key": key, "values": value })]
+                 }
+               }         
+         
+      addContent: 
+        invoke: 
+          - request: 
+              method: post 
+              headers: |
+                = {
+                    "Origin": "https://dmstest.kvhessen.de",
+                    "Content-Type": "application/octet-stream"
+                  }
+              url: = $format("/dms/r/%s/blob/chunk",_defaults.repositoryId)
+              body: = soap.contentData.content
+            transform: |
+              = {
+                 "location": $lookup(response.headers,'location')
+               }
+            storeAs: upload 
+          - request: 
+              method: post 
+              headers: | 
+                = {
+                 "Origin": "https://dmstest.kvhessen.de",
+                 "Content-Type": "application/json"
+                }
+              url: = $format("/dms/r/%s/o2m", _defaults.repositoryId)
+              body: |
+                = (
+                  $defaults := { 
+                    "14": "test",
+                    "2": "Eingangsrechnungen allgemein",
+                    "9": $toMillis($now()) ~> $fromMillis('[Y0001]-[M01]-[D01]', '+0200'),
+                    "85": "d3_exch",
+                    "80": "de_exch"
+                  };    
+
+                  $soapkeys := [soap.contentDescription.properties.key];
+
+                  $soapProps := soap.contentDescription.properties[key != "docType"].({"key": key, "values": value }); 
+
+                  $buildDefaults := function() {
+                      $each($defaults, function($v, $k) { { "key": $k, "values": [$v] } })[key in $soapkeys ~> $not]
+                  }; 
+
+                  $result := {
+                    "filename": soap.contentDescription.filename,
+                    "sourceCategory": soap.contentDescription.properties[key = "docType"].value[0],
+                    "sourceId": $format("/dms/r/%s/source",_defaults.repositoryId),
+                    "contentLocationUri": upload.location,
+                    "sourceProperties": {
+                      "properties": $append($soapProps, $buildDefaults())
+                    }
+                  }; 
+                
+                  $result 
+                )
+            transform: |
+              = {
+                 "href": $lookup(response.headers,'location')
+                }
+            storeAs: update 
+          - request: 
+              url: = update.href 
+              headers: |
+                = {
+                 "Origin": "https://dmstest.kvhessen.de"
+                }
+            transform: |
+               = (
+                   $convertStamp := function($stamp) { $toMillis($stamp) ~> $fromMillis('[Y0001]-[M01]-[D01] [H01]:[m01]:[s01]', '+0200') };               
+                   
+                   $result := {
+                     "dmsId": response.data.id,
+                     "creationDate": response.data.sourceProperties[key = "property_creation_date"].value ~> $convertStamp
+                   };
+                   
+                   $result 
+                  )
+   
+      supportsDelete: 
+        invoke: 
+          - request:
+              url: /search
+              params: 
+                query: = $format("data.backend.wcs.DocumentId == '%s'", soap.DocumentId) 
+                projection: id 
+                limit: 1 
+            transform: = response.data.rows[0].id
+            errors: 
+              - condition: = response.data.size = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+            storeAs: docId
+          - transform: |
+              = 
+              { 
+                "supported": true 
+              }
+            
+      delete: 
+        invoke: 
+          - request:
+              url: /search
+              params: 
+                query: = $format("data.backend.wcs.DocumentId == '%s'", soap.DocumentId) 
+                projection: id 
+                limit: 1 
+            transform: = response.data.rows[0].id
+            errors: 
+              - condition: = response.data.size = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+            storeAs: docId
+          - request: 
+              method: delete 
+              url: $format("/doc/%s", docId)
+              

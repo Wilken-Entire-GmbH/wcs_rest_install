@@ -1,0 +1,5 @@
+# P5/2 DMS Post Configuration
+
+WDSREST_SOAP_URL: http://${env.SOAP_HOSTNAME}:${env.WDSREST_HTTP_PORT}/soap/ContentService
+WDSREST_SOAPCONFIG_URL: http://${env.SOAP_HOSTNAME}:${env.WDSREST_HTTP_PORT}/soap/ContentConfigurationService
+WDSREST_PROPERTYSTORE_PATH: ${env.WDS_RUNTIME_DIR}/store.json
