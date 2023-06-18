@@ -28,6 +28,9 @@ server:
     access:
       auth: basic
   bindProtocol: ['http']
+metric: 
+  enabled: true 
+  tenantid: WCS3 REST
 services:
   retrieval: 
     url: 'http://localhost:8080'
@@ -53,6 +56,6 @@ context:
       forwardURL: null
     config: 
       file: wcs3rest/config.yaml
-      restConnector: d3
+      restConnector: p5dms
     metric: 
       subtitle: 'Content Service Rest'

@@ -1,0 +1,1 @@
+{"configuration":{"logging":{"logPath":"","logLevel":"INFO","keepDays":7},"documentPolling":{"useDocumentPolling":false,"pollingInterval":300,"callBackServiceURL":"","syncFlagDMSPropertyName":"","syncFlagValue":""},"defaultUniqueServerName":"","dmsServer":[],"docTypes":[]},"properties":{}}

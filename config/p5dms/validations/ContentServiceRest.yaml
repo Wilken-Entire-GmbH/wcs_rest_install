@@ -1,0 +1,123 @@
+definitions:
+  $id: 'http://wilken.de/p5/schemas/wcs3D3/defs'
+  definitions:
+
+    MappingColumnsConfig: 
+      type: object 
+      
+    MappingConfig: 
+      type: object 
+      properties: 
+        columns: { $ref: defs#/definitions/MappingColumnsConfig }
+      additionalProperties: false 
+      required: [ columns ]
+
+    MethodRequestOptionsConfig: 
+      type: object 
+      properties: 
+        requestType: { type: string, enum: [json, formdata], default: json }
+        responseType: { type: string, enum: [json, buffer], default: json }
+      additionalProperties: false 
+            
+    MethodRequestConfig: 
+      type: object 
+      properties: 
+        method: { type: string, enum: [ get, post, put, delete ], default: get }
+        url: { type: string }
+        body: { type: [string, object]}
+        params: { type: [object, string] , default: {} }
+        headers: { type: [object, string] }
+        options: { $ref: defs#/definitions/MethodRequestOptionsConfig, default: { responseType: json, requestType: json }}
+      additionalProperties: false 
+      required: [ url ]
+
+    MethodResponseConfig: 
+      type: object 
+      properties: 
+        transform: { type: string }
+        mapping: { type: string }
+      additionalProperties: false 
+      required: [ transform, mapping ]
+
+    MethodErrorConfig: 
+      type: object 
+      properties: 
+        condition: { type: string }
+        code: { type: string }
+        message: { type: string }
+      additionalProperties: false 
+      required: [ condition, code, message ]
+
+    MethodConfig: 
+      type: object 
+      properties: 
+        request: { $ref: defs#/definitions/MethodRequestConfig }
+        transform: { type: [string, object] }
+        mapping: { type: [string, object] }
+        errors: { type: array, items: { $ref: defs#/definitions/MethodErrorConfig } }
+        storeAs: { type: string }
+      additionalProperties: false 
+      required: [ ]
+
+    AuthorizationConfig: 
+      type: object 
+
+    ConnectionConfig: 
+      type: object 
+
+    MappingsConfig: 
+      type: object 
+    
+    InvocationConfig: 
+      type: object 
+      properties: 
+        invoke: 
+          oneOf: 
+            - $ref: defs#/definitions/MethodConfig
+            - type: array 
+              items: { $ref:  defs#/definitions/MethodConfig }
+      additionalProperties: false 
+      required: [ invoke ]
+
+    WcsMethodsConfig: 
+      type: object
+      properties: 
+        test: { $ref: defs#/definitions/InvocationConfig }
+        searchContent: { $ref: defs#/definitions/InvocationConfig }
+        getContentData: { $ref: defs#/definitions/InvocationConfig }
+        getContentDescription: { $ref: defs#/definitions/InvocationConfig }
+        updateProperties: { $ref: defs#/definitions/InvocationConfig }
+        addContent: { $ref: defs#/definitions/InvocationConfig }
+        supportsDelete: { $ref: defs#/definitions/InvocationConfig }
+        delete: { $ref: defs#/definitions/InvocationConfig }
+      additionalProperties: false 
+      required: [ test, searchContent, getContentData, getContentDescription, updateProperties, addContent, supportsDelete, delete ]
+
+    RestConnectorConfig: 
+      type: object 
+      properties: 
+        defaults: { type: object }
+        baseUrl: { type: string }
+        authorization: { $ref: defs#/definitions/AuthorizationConfig }
+        connection: { $ref: defs#/definitions/ConnectionConfig }
+        mappings: { $ref: defs#/definitions/MappingsConfig }
+        wcsMethods: { $ref: defs#/definitions/WcsMethodsConfig }
+        #apiKey: { type: string }
+        #repositoryId: { type: string }
+        #mapping: { $ref: defs#/definitions/MappingConfig }
+        #methods: { $ref: defs#/definitions/MethodsConfig }
+      additionalProperties: false 
+      #required: [ baseUrl, apiKey, repositoryId, mapping, methods  ]
+      required: [ defaults, baseUrl, authorization, connection, mappings ]
+    RestConnectorsConfig: 
+      type: object 
+      additionalProperties: { $ref: defs#/definitions/RestConnectorConfig }
+  
+schemas:
+  ConfigFile:
+    $id: 'http://wilken.de/p5/schemas/wcs3D3/ConfigFile'
+    $async: false
+    type: object
+    properties:
+      Connectors: { $ref: defs#/definitions/RestConnectorsConfig }
+    additionalProperties: false
