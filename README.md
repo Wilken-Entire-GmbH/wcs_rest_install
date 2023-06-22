@@ -119,10 +119,6 @@ WDSREST_SOAP_LOG | Erweitertes SOAP Logging Contentservice an/aus.
 WDSREST_SOAPCONFIG_LOG | Erweitertes SOAP Logging ContentConfiguration Service an/aus.
 
 
-WDSREST_BASEURL: 'https://dmstest.kvhessen.de'
-WDSREST_AUTH_BEARER: 1XRYGVx61xAWOJVtt95sIYT8lFBZUoBYfDASBMDdNbeXLQFtN0eHHgue/BShwgx0Dz281Pq2nGvxYxsYq+N+ZSHGm3+v9Qy+HqIuUN3Qvx+Qz6P3tjf2xUUDMNNBs4F4&_z_A0V5ayCQBERg_iP8nq_sWPgilPGKvBsEolQb-HjyHRTPt6iAhENl-spNKGaegiUHHd0aCsyOAXosMgfZ4I5CdBInE5qGg
-WDSREST_D3_REPOSITORYID: 27cc8f0e-c069-5b05-99de-46bc77968723
-
 
 
 
