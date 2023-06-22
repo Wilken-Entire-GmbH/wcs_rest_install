@@ -45,7 +45,7 @@ if not exist %TENANTCONFIG% (
 
 set WCS3REST=p5dmsWcs3Rest_%TENANT%
 
-rem wds_mail setup
+rem wcs3 to rest setup
 nssm install %WCS3REST% "%BIN_DIR%\wds_contentservice_rest.exe" 
 nssm set %WCS3REST% AppDirectory "%WORKING_DIR%"
 nssm set %WCS3REST% DisplayName "Wilken P/5 DMS WCS3 REST Adapter for %TENANT%"
@@ -53,7 +53,7 @@ nssm set %WCS3REST% Description "Wilken P/5 DMS WCS3 REST Adapter for %TENANT%"
 nssm set %WCS3REST% Start SERVICE_DELAYED_AUTO_START
 nssm set %WCS3REST% AppStdout "%LOG_DIR%\%TENANT%_wcs3rest.log"
 nssm set %WCS3REST% AppStderr "%LOG_DIR%\%TENANT%_wcs3rest.log"
-nssm set %WCS3REST% AppEnvironmentExtra WDS_CONFIG_DIR=%WDS_CONFIG_DIR%^%LF%%LF%WDS_TENANT_CONFIG=%TENANT%^%LF%%LF%WDS_RUNTIME_DIR=%WORKING_DIR%\p5dms\%TENANT%
+nssm set %WCS3REST% AppEnvironmentExtra WDS_CONFIG_DIR=%WDS_CONFIG_DIR%^%LF%%LF%NODE_TLS_REJECT_UNAUTHORIZED=0^%LF%%LF%WDS_TENANT_CONFIG=%TENANT%^%LF%%LF%WDS_RUNTIME_DIR=%WORKING_DIR%\p5dms\%TENANT%
 
 :end
 endlocal

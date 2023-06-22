@@ -10,10 +10,10 @@ server:
           dirname: logs # dirname from 
           # filename:     # if empty => uses serviceName
           extension: .log
-          maxSize: 20m    # max size of file is 20mb
+          maxSize: 20m # max size of file is 20mb
           maxFiles: 14d   #delete files after 14 days
       Console:
-        active: false   
+        active: true
   swagger:
     enable: true
     file: assets/openapi.yaml
@@ -56,6 +56,10 @@ context:
       forwardURL: null
     config: 
       file: wcs3rest/config.yaml
-      restConnector: p5dms
+      restConnector: none
+    env: 
+      baseUrl: ''
+      auth_bearer: ''
+      d3_repositoryId: ''
     metric: 
       subtitle: 'Content Service Rest'

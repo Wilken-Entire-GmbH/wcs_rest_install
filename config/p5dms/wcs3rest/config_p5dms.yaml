@@ -1,7 +1,7 @@
 Connectors:
   p5dms: 
     defaults: {}
-    baseUrl: 'http://docker-nuc.fritz.box:8500/'
+    baseUrl: ${config.env.baseURL}
     authorization: 
       type: Basic 
       options: 

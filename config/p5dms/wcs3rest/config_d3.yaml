@@ -1,45 +1,74 @@
 Connectors:
   d3: 
     defaults:
-      repositoryId: 27cc8f0e-c069-5b05-99de-46bc77968723
+      repositoryId: ${config.env.d3_repositoryId}
+      category: D0016
       mapping: 
         toD3:
           DocumentId: property_document_id
           docType: property_category
-    baseUrl: 'https://dmstest.kvhessen.de'
+          2: 97
+          3: 14
+          8: 80 
+          9: 21
+          11: 54
+          12: 82
+          14: 28
+          15: 55 
+          23: 40
+          34: 95 
+          35: 93
+          40: 85 
+          41: 26
+          50: 7
+          52: 9
+          63: 45
+          67: 83
+          68: 2
+
+    baseUrl: ${config.env.baseURL}
     authorization: 
       type: Bearer 
       options:
-        key: 1XRYGVx61xAWOJVtt95sIYT8lFBZUoBYfDASBMDdNbeXLQFtN0eHHgue/BShwgx0Dz281Pq2nGvxYxsYq+N+ZSHGm3+v9Qy+HqIuUN3Qvx+Qz6P3tjf2xUUDMNNBs4F4&_z_A0V5ayCQBERg_iP8nq_sWPgilPGKvBsEolQb-HjyHRTPt6iAhENl-spNKGaegiUHHd0aCsyOAXosMgfZ4I5CdBInE5qGg  
+        key: ${config.env.auth_bearer}
     connection:
       type: D3
       options: {}
     mappings: 
-      p5dmsToWCS: |
-        (
-          $main := data.backend.wcs.{
-            "DocumentId": DocumentId,
-            "mimeType": mimeType,
-            "filename": filename,
-            "creationDate": creationDate
-          }; 
-
-          $merge([ 
-            { "dmsId": id}, 
-            $main,
-            { "properties": $keys(data.backend.wcs)[$not( $ in $keys($main))].{ "key": $, "value": $lookup($$.data.backend.wcs, $) } }
-          ])      
-        )
       d3SearchToWCS: |
         (
+          $fromD3 := {
+            "97": "2",
+            "14": "3",
+            "80": "8",
+            "21": "9",
+            "54": "11",
+            "82": "12",
+            "28": "14",
+            "55": "15",
+            "40": "23",
+            "95": "34",
+            "93": "35",
+            "85": "40",
+            "26": "41",
+            "7": "50",
+            "9": "52",
+            "45": "63",
+            "83": "67",
+            "2": "68"
+          };
+
           $convertStamp := function($stamp) { $toMillis($stamp) ~> $fromMillis('[M01]-[D01]-[Y0001] [H01]:[m01]:[s01]', '+0200') };
+          $convertDate := function($d) { $toMillis($d, "[Y0001]-[M01]-[D01]") ~> $fromMillis("[D01].[M01].[Y0001]") };
 
           $.(
             $filename := displayProperties[id = "property_filename"].value; 
             $extension := displayProperties[id = "property_filetype"].value;
             $docType := { "key": "docType", "value": category.id };
+            $f999 := { "key": "999", "value": category.id };
             $main := {
               "DocumentId": id,
+              "dmsId": id,
               "mimeType": mimeType,
               "filename": $filename ? $filename : id & "." & $extension,
               "creationDate": $convertStamp(created) 
@@ -49,24 +78,48 @@ Connectors:
               {
                 "properties": $append(
                   $docType,
-                  displayProperties.{
-                    "key": id,
-                    "value": dataType = 3 ? $convertStamp(value) : value 
-                  })
+                  displayProperties[id in $keys($fromD3)].{
+                    "key": $lookup($fromD3,id),
+                    "value": dataType = 3 ? $convertStamp(value) : dataType = 4 ? $convertDate(value) : value 
+                  }) ~> $append($f999)
               }
             ])
           )
         )
       d3DetailsToWCS: |
         (
+          $fromD3 := {
+            "97": "2",
+            "14": "3",
+            "80": "8",
+            "21": "9",
+            "54": "11",
+            "82": "12",
+            "28": "14",
+            "55": "15",
+            "40": "23",
+            "95": "34",
+            "93": "35",
+            "85": "40",
+            "26": "41",
+            "7": "50",
+            "9": "52",
+            "45": "63",
+            "83": "67",
+            "2": "68"
+          };
+
           $convertStamp := function($stamp) { $toMillis($stamp) ~> $fromMillis('[Y0001]-[M01]-[D01] [H01]:[m01]:[s01]', '+0200') };
+          $convertDate := function($d) { $toMillis($d, "[Y0001]-[M01]-[D01]") ~> $fromMillis("[D01].[M01].[Y0001]") };
 
           $.(
             $filename := systemProperties[id = "property_filename"].value; 
             $extension := systemProperties[id = "property_filetype"].value;
             $docType := { "key": "docType", "value": systemProperties[id = "property_category"].value };
+            $f999 := { "key": "999", "value": systemProperties[id = "property_category"].value };
             $main := {
-                "DocumentId": property_document_id,
+                "DocumentId": systemProperties[id = "property_document_id"].value,
+                "dmsId": systemProperties[id = "property_document_id"].value,
                 "mimeType": mimeType,
                 "filename": $filename ? $filename : id & "." & $extension,
                 "creationDate": $convertStamp(systemProperties[id = "property_creation_date"].value) 
@@ -77,14 +130,11 @@ Connectors:
                 {
                     "properties": $append(
                         $docType,
-                        objectProperties.{
-                            "key": id, 
-                            "value": dataType = 3 ? $convertStamp(value) : value 
+                        objectProperties[id in $keys($fromD3)].{
+                            "key": $lookup($fromD3, id), 
+                            "value": dataType = 3 ? $convertStamp(value) : dataType = 4 ? $convertDate(value) : value 
                         }
-                        ) ~> $append(systemProperties.{
-                            "key": id,
-                            "value": dataType = 3 ? $convertStamp(value) : value 
-                        })
+                    )  ~> $append($f999)
                 }
             ])
           )
@@ -107,7 +157,7 @@ Connectors:
             params: |
               = (
                   $soap := ($ ~> | soap.query.property | ( 
-                    $key := $lookup($$._defaults.mapping.toD3,key); 
+                    $key := "" & $lookup($$._defaults.mapping.toD3,key); 
                     { "key": $key ? $key : key }
                   ) |).soap;
     
@@ -182,24 +232,31 @@ Connectors:
           - request:
              method: put 
              headers: 
-               Origin: https://dmstest.kvhessen.de
+               Origin: = _defaults.baseUrl
              url: = $format("/dms/r/%s/o2/%s", _defaults.repositoryId, soap.DocumentId)
              body: |
-               = {
-                 "sourceCategory": ref.category,
-                 "sourceId": $format("/dms/r/%s/source", _defaults.repositoryId), 
-                 "sourceProperties": {
-                    "properties": [soap.contentProperties.( {"key": key, "values": value })]
+               = (
+                  $dateToD3 :=  function($d) { $toMillis($d, "[D01].[M01].[Y0001]") ~> $fromMillis("[Y0001]-[M01]-[D01]") }; 
+                  {
+                   "sourceCategory": ref.category,
+                   "sourceId": $format("/dms/r/%s/source", _defaults.repositoryId), 
+                   "sourceProperties": {
+                      "properties": [soap.contentProperties.( 
+                        $kmap := $lookup($$._defaults.mapping.toD3, key); 
+                        $value := $kmap in [9,7] ? [value.( $dateToD3($) )]  : value;
+                        {"key": "" & $kmap, "values": $value }
+                      )]                      
+                   }
                  }
-               }         
-         
+               )               
+ 
       addContent: 
         invoke: 
           - request: 
               method: post 
               headers: |
                 = {
-                    "Origin": "https://dmstest.kvhessen.de",
+                    "Origin": _defaults.baseUrl,
                     "Content-Type": "application/octet-stream"
                   }
               url: = $format("/dms/r/%s/blob/chunk",_defaults.repositoryId)
@@ -213,18 +270,20 @@ Connectors:
               method: post 
               headers: | 
                 = {
-                 "Origin": "https://dmstest.kvhessen.de",
+                 "Origin": _defaults.baseUrl,
                  "Content-Type": "application/json"
                 }
               url: = $format("/dms/r/%s/o2m", _defaults.repositoryId)
               body: |
                 = (
+                  $dateToD3 :=  function($d) { $toMillis($d, "[D01].[M01].[Y0001]") ~> $fromMillis("[Y0001]-[M01]-[D01]") }; 
+
                   $defaults := { 
-                    "14": "test",
-                    "2": "Eingangsrechnungen allgemein",
-                    "9": $toMillis($now()) ~> $fromMillis('[Y0001]-[M01]-[D01]', '+0200'),
-                    "85": "d3_exch",
-                    "80": "de_exch"
+                    "3": "test",
+                    "68": "Eingangsrechnungen allgemein",
+                    "52": $toMillis($now()) ~> $fromMillis('[Y0001]-[M01]-[D01]', '+0200'),
+                    "40": "d3_exch",
+                    "8": "de_exch"
                   };    
 
                   $soapkeys := [soap.contentDescription.properties.key];
@@ -237,11 +296,15 @@ Connectors:
 
                   $result := {
                     "filename": soap.contentDescription.filename,
-                    "sourceCategory": soap.contentDescription.properties[key = "docType"].value[0],
+                    "sourceCategory": _defaults.category,
                     "sourceId": $format("/dms/r/%s/source",_defaults.repositoryId),
                     "contentLocationUri": upload.location,
                     "sourceProperties": {
-                      "properties": $append($soapProps, $buildDefaults())
+                      "properties": $append($soapProps,$buildDefaults()).(
+                        $kmap := $lookup($$._defaults.mapping.toD3, key); 
+                        $value := $kmap in [9,7] ? [values.( $dateToD3($) )]  : values;
+                        {"key": "" & $kmap, "values": $value }
+                      )
                     }
                   }; 
                 
@@ -252,11 +315,16 @@ Connectors:
                  "href": $lookup(response.headers,'location')
                 }
             storeAs: update 
+            errors:
+              - condition: = response.status >= 400
+                code: = response.status 
+                message: |
+                  =  $format("errCode=%s, propertyField=%s, reason=%s text=%s", response.data.errorCode, response.data.propertyFieldId, response.data.reason, response.statusText) 
           - request: 
               url: = update.href 
               headers: |
                 = {
-                 "Origin": "https://dmstest.kvhessen.de"
+                 "Origin": _defaults.baseUrl"
                 }
             transform: |
                = (
@@ -287,7 +355,7 @@ Connectors:
           - transform: |
               = 
               { 
-                "supported": true 
+                "supported": false
               }
             
       delete: 

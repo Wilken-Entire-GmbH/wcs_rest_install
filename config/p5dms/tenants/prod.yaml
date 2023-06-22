@@ -6,6 +6,11 @@ TENANT_CAPTION: Prod - WCS3 To REST Adapter
 # http port of service
 WDSREST_HTTP_PORT: 6950
 
+# rest connector type 
+WDSREST_CONNECTOR: '??????'
+WDSREST_BASEURL: '?????????????'
+WDSREST_BEARER: ''
+
 # extend logging of soap calls
 WDSREST_SOAP_LOG: true 
 WDSREST_SOAPCONFIG_LOG: true

@@ -23,4 +23,10 @@ context:
         url: WDSREST_SOAPCONFIG_URL 
         log: WDSREST_SOAPCONFIG_LOG
     propertyStore: 
-      path: WDSREST_PROPERTYSTORE_PATH 
+      path: WDSREST_PROPERTYSTORE_PATH
+    config:
+      restConnector: WDSREST_CONNECTOR
+    env: 
+      baseURL: WDSREST_BASEURL
+      auth_bearer: WDSREST_AUTH_BEARER
+      d3_repositoryId: WDSREST_D3_REPOSITORYID
