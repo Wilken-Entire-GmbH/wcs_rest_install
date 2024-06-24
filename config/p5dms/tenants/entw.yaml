@@ -1,14 +1,17 @@
-# P5/2 DMS WCS3 Mockservice Tenant Configuration
+# P5 DMS WCS3 Restservice Tenant Configuration
 
 # tenant 
-TENANT_CAPTION: Entw - WCS3 To REST Adapter
+TENANT_CAPTION: Development - WCS3 To REST Adapter
 
 # http port of service
-WDSREST_HTTP_PORT: 6952
+WDSREST_HTTP_PORT: 6953
 
 # rest connector type 
-WDSREST_CONNECTOR: '??????'
-WDSREST_BASEURL: '?????????????'
+WDSREST_CONNECTOR: kendox
+WDSREST_BASEURL: 'http://<kendoxserver>:<port>'
+WDSREST_AUTH_USER: '<kendoxuser>'
+WDSREST_AUTH_PASSWORD: '<kendoxpassword>'
+#WDSREST_AUTH_ENCRYPTPASSWORD: '<kendoxcliencryptpassword>'
 
 # extend logging of soap calls
 WDSREST_SOAP_LOG: true 

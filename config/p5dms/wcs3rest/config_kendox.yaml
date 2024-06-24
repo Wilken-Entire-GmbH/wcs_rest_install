@@ -1,0 +1,582 @@
+Connectors:
+  kendox: 
+    defaults:
+      enums: 
+        xprojection: 
+          - DocumentId
+          - FachobjektId
+          - mimeType
+          - filename
+          - creationDate
+        operators: 
+          '<': Less 
+          l: LessEquals
+          '=': Equals
+          g: GreaterEquals
+          '>': Greater
+          '!': NotEquals 
+          '~': Like 
+          'i': In 
+      templates: 
+        createDocument: 
+          connectionId: <sessionId>
+          document: 
+            Properties: [] 
+            Blogs: []
+            AccessRightsEnumList: []
+            Reminders: []
+            Abonnements: []
+            DocumentData: []
+            InfoStoreId: <infoStoreId>
+            ProtectionDomainId: <protectionDomainId>
+            Name: <filename>
+            ImportTemplateId: <importTemplateId>
+            LifeCycleManager: 
+              NextLifeCycleStates: []
+              LifeCycleProtections: []
+              LifeCycleId: <lifeCycleId>
+          fileId: <fileid from Upload>
+          options: 
+            MergePropertiesIntoDocument: false
+            Comment: null
+            Version: null 
+        search: 
+          connectionId: <sessionId>
+          searchDefinition: 
+            Conditions: []
+            FulltextWordRelation: AND
+            FulltextWords: ""
+            PageSize: <page_size>
+            UseWildCard: true
+          resultProperties: []
+          resumePoint: ""
+
+    baseUrl: ${config.env.baseURL}
+    authorization: 
+      type: Session 
+      options: 
+        logonMethod: logon 
+        user: ${config.env.user} 
+        password: ${config.env.password}
+        encryptPassword: ${config.env.encryptPassword}
+    connection:
+      type: p5dms 
+      options: 
+        classifiers: [ 'invoice', 'ermInvoice', 'ermVoucher']
+    mappings: { }
+    globalMethods: 
+      logon: 
+        invoke: 
+          - request: 
+              method: post
+              url: /InfoShare/Json/Authentication/Logon
+              body: |
+                =
+                  {
+                    "userName": auth.options.user, 
+                    "passwordHashed": auth.options.password ~> $kendoxHashedPassword
+                  }
+            transform: | 
+              = 
+                {
+                  "sessionId": response.data.LogonResult.ConnectionId,
+                  "expires": $millis() + response.data.LogonResult.ConnectionTimeoutSeconds * 1000 
+                }
+            errors:
+              - condition: = response.status = 400 and response.data.ErrorNumber = 10006
+                code: 401
+                message: = $format('request failed %s/%s. kendox logon failed. (%s/%s)',response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+      init: 
+        invoke: 
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Server/GetServerVersion
+            transform: = response.data.GetServerVersionResult
+            storeAs: version
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Server/GetLicenceInfo
+              body: |
+                = {
+                    "connectionId": _global.logon.sessionId
+                  }
+            transform: |
+              = {
+                "id": 16993,
+                "type": "Full",
+                "validFrom": "2023-03-22T23:00:00",
+                "validTo": "2024-12-30T23:00:00",
+                "named": {
+                  "licences": 1,
+                  "MaxSessions": 20
+                },
+                "concurrent": {
+                  "licences": 1,
+                  "maxSessions": 20
+                },
+                "owner": "Wilken GmbH, 89081 Ulm, Deutschland",
+                "server": "WIN-TF0D3OQQL6L",
+                "features": [
+                  {
+                    "id": "af676d82-ed4b-4456-b73e-a7cf820cc625",
+                    "name": "Vorgangsmanager Plus"
+                  },
+                  {
+                    "id": "5b5d6fc6-8df1-422a-bd16-ad40935d1173",
+                    "name": "Mobile Web Client (MWC)"
+                  },
+                  {
+                    "id": "9bbd5f59-9257-4788-941b-7ab069c9448a",
+                    "name": "WKCS Connector"
+                  },
+                  {
+                    "id": "33406f3e-3256-4257-bb27-cb8c2ce2ad2e",
+                    "name": "Verschlüsselte Dateiablage"
+                  }
+                ]
+              }
+            storeAs: license 
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Common/GetSchemaStore
+              body: |
+                = {
+                    "connectionId": _global.logon.sessionId
+                  }
+            transform: | 
+              = (
+                    $wcsTemplate := response.data.GetSchemaStoreResult.ImportTemplates[Name.Values[Culture = "de" and Text = "WCS"]].{
+                        "storeId": InfoStoreId,
+                        "lifeCycleId": LifeCycleId,
+                        "propertyPageTemplateId": PropertyPageTemplateId,
+                        "protectionDomainId": ProtectionDomainId,
+                        "importTemplateId": Id 
+                    } ~> | $ | {
+                      "version": $$.version,
+                      "license" : $$.license
+                    } |; 
+
+                    $wcsPropCategoryId := response.data.GetSchemaStoreResult.PropertyTypeCategories[Name.Values[Culture = "de" and Text = "WCS"]].Id;
+                  
+                    $wcsProperties := response.data.GetSchemaStoreResult.PropertyTypes[PropertyTypeCategoryId = $wcsPropCategoryId].{
+                        "kendoxId": Id,
+                        "wcsId": Name.Values[Culture = "de"].Text
+                    }; 
+
+                    $merge([$wcsTemplate,{
+                        "mappings": {
+                            "toDMS": $wcsProperties.{ wcsId: kendoxId } ~> $merge,
+                            "fromDMS": $wcsProperties.{ kendoxId: wcsId } ~> $merge
+                        }
+                    }])
+                )                
+
+    wcsMethods:  
+      test: 
+        invoke: 
+          - transform: = _global.init
+
+      searchContent:
+        invoke: 
+          request: 
+            method: post 
+            url: /InfoShare/Json/Search/Search
+            body: |
+              = (
+                  $limit := soap.limit > 0 ? soap.limit : 100;
+                  $resume := soap.resume ? soap.resume : "";
+
+                  $projection := (
+                      $count([soap.projection]) > 0 
+                          ? soap.projection
+                          : $count([_defaults.enums.projection]) > 0
+                              ? _defaults.enums.projection
+                              : $keys(_global.init.mappings.toDMS)
+                  ).$lookup($$._global.init.mappings.toDMS, $); 
+
+                  $conditions := soap.query.(
+                      {
+                          "Values": [$.property.value],
+                          "ComparisonEnum": $lookup($$._defaults.enums.operators,$.operator),
+                          "PlaceHolder": "",
+                          "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, $.property.key),
+                          "RelationEnum": "And"
+                      }
+                  )[$exists(PropertyTypeId) and $exists(ComparisonEnum)];
+
+                  _defaults.templates.search ~> | $ | { 
+                      "connectionId": $$._global.logon.sessionId,
+                      "resultProperties": $projection,
+                      "resumePoint": $resume
+                  } | ~> | searchDefinition | { 
+                          "Conditions": [$conditions],
+                          "PageSize": "10"
+                      } |; 
+              )
+          transform: |
+              = (
+                  $pick := function($obj,$props) { 
+                      $props.(
+                          $v := $lookup($obj, $); 
+                          { $: [$v][0] }
+                      ) ~> $merge 
+                  };
+
+                  $toProp := function($v, $k) { { "key": $k, "value": $v } };
+
+
+                  response.data.SearchResult.Documents.(
+
+                      $filename := $.Name; 
+                      $dmsId := $.Id;
+
+                      $result := $.Properties.(
+                          { $lookup($$._global.init.mappings.fromDMS, PropertyTypeId) : Values }
+                      ) ~> $merge; 
+                  
+                      $main := $pick($result, ["DocumentId", "mimeType", "filename", "creationDate"])
+                          ~> | $ | { "filename": $filename, "dmsId": $dmsId } |; 
+                    
+                      $merge([
+                          $main,
+                          { "properties": [$each($result, $toProp)[value][$not( key in $keys($main))]] }
+                      ])
+                  )
+              )
+
+      getContentDescription: 
+        invoke:
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Search/Search
+              body: |
+                = (
+                    $resultProperties := (
+                        $count([soap.resultProperties]) > 0 
+                            ? soap.resultProperties
+                            : $count([_defaults.enums.projection]) > 0
+                                ? _defaults.enums.projection
+                                : $keys(_global.init.mappings.toDMS)
+                    ).$lookup($$._global.init.mappings.toDMS, $); 
+
+                    $condition := {
+                        "Values": [$$.soap.DocumentId],
+                        "ComparisonEnum": "Equals",
+                        "PlaceHolder": "",
+                        "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, "DocumentId"),
+                        "RelationEnum": "And" 
+                    }; 
+
+                    _defaults.templates.search ~> | $ | { 
+                        "connectionId": $$._global.logon.sessionId,
+                        "resultProperties": $resultProperties
+                    } | ~> | searchDefinition | { 
+                            "Conditions": [$condition],
+                            "PageSize": "1"
+                        } |; 
+                )
+            transform: |
+              = (
+                  $pick := function($obj,$props) { 
+                      $props.(
+                          $v := $lookup($obj, $); 
+                          { $: [$v][0] }
+                      ) ~> $merge 
+                  };
+
+                  $toProp := function($v, $k) { { "key": $k, "value": $v } };
+
+                  $filename := response.data.SearchResult.Documents[0].Name; 
+                  $dmsId := response.data.SearchResult.Documents[0].Id;
+
+                  $result := response.data.SearchResult.Documents[0].Properties.(
+                      { $lookup($$._global.init.mappings.fromDMS, PropertyTypeId) : Values }
+                  ) ~> $merge; 
+
+                  $main := $pick($result,["DocumentId", "mimeType", "filename","creationDate"])
+                    ~> | $ | { "filename": $filename, "dmsId": $dmsId } |; 
+
+                  $merge([
+                      $main,
+                      { "properties": [$each($result, $toProp)[$not( key in $keys($main))]][$not(value = null)] }
+                  ])
+              )              
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = $count([response.data.SearchResult.Documents]) = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+      getContentData: 
+        invoke: 
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Search/Search
+              body: |
+                = (
+                    $condition := {
+                        "Values": [$$.soap.DocumentId],
+                        "ComparisonEnum": "Equals",
+                        "PlaceHolder": "",
+                        "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, "DocumentId"),
+                        "RelationEnum": "And" 
+                    }; 
+
+                    _defaults.templates.search ~> | $ | { 
+                        "connectionId": $$._global.logon.sessionId,
+                        "resultProperties": [$lookup($$._global.init.mappings.toDMS, "mimeType")]
+                    } | ~> | searchDefinition | { 
+                            "Conditions": [$condition],
+                            "PageSize": "1"
+                        } |; 
+                )
+            transform: |
+              = (
+                  $mimeTypeId := $lookup(_global.init.mappings.toDMS,'mimeType');
+                  
+                  {
+                    "dmsId": response.data.SearchResult.Documents[0].Id, 
+                    "mimeType": response.data.SearchResult.Documents[0].Properties[PropertyTypeId = $mimeTypeId].[Values][0]
+                  }
+                )
+            storeAs: doc
+            errors:
+              - condition: = $count([response.data.SearchResult.Documents]) = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+          - request: 
+              method: post 
+              url: /InfoShare/Json/File/DownloadFile
+              body: |
+                = {
+                    "connectionId": _global.logon.sessionId,
+                    "documentId": doc.dmsId,
+                    "ignoreHashValidation": false
+                  }
+              options: 
+                responseType: buffer
+            transform: 
+              contentType: = doc.mimeType 
+              buffer: = response.data
+
+      updateProperties: 
+        invoke: 
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Search/Search
+              body: |
+                = (
+                    $condition := {
+                        "Values": [$$.soap.DocumentId],
+                        "ComparisonEnum": "Equals",
+                        "PlaceHolder": "",
+                        "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, "DocumentId"),
+                        "RelationEnum": "And" 
+                    }; 
+
+                    _defaults.templates.search ~> | $ | { 
+                        "connectionId": $$._global.logon.sessionId
+                    } | ~> | searchDefinition | { 
+                            "Conditions": [$condition],
+                            "PageSize": "1"
+                        } |; 
+                )
+            transform: |
+              = { "dmsId": response.data.SearchResult.Documents[0].Id }
+            storeAs: searchDoc
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = $count([response.data.SearchResult.Documents]) = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Document/GetDocument
+              body: |
+                = {
+                    "connectionId": $$._global.logon.sessionId,
+                    "documentId": searchDoc.dmsId
+                  }
+            transform: |
+              = response.data.GetDocumentResult
+            storeAs: doc
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Document/UpdateDocument
+              body: |
+                = (
+                    $updProps:= soap.contentProperties.{ 
+                      "PropertyTypeId": $lookup($$._global.init.mappings.toDMS,key),
+                      "Values": [value] 
+                    }; 
+
+                    $toDict := function($arr) { $arr.({ PropertyTypeId: Values }) ~> $merge }; 
+                    
+                    $toUpdate := [doc.Properties ~> $toDict, $updProps[$exists(PropertyTypeId)] ~> $toDict] ~> $merge; 
+
+                    $updateDoc := doc ~> | $ | { "Properties": $keys($toUpdate).({ "PropertyTypeId": $, "Values":  $lookup($toUpdate, $)}) } |; 
+
+                   {
+                      "connectionId": $$._global.logon.sessionId,
+                      "document": $updateDoc,
+                      "checkInParameter": {
+                          "ReleaseReservation": true
+                        }
+                    }
+                  )
+            transform: |
+              = response.data  
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+
+      addContent: 
+        invoke:
+          - transform: |
+              = $wcsCurrentDate()
+            storeAs: creationDate
+          - request: 
+              method: post
+              url: /InfoShare/Json/File/UploadFileBytes
+              body: |
+                = {
+                    "connectionId": _global.logon.sessionId,
+                    "bytes": $arrayFromBuffer(soap.contentData.content),
+                    "from": 0 
+                  }
+            transform: |
+              = response.data.UploadFileBytesResult
+            storeAs: fileId
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Document/CreateDocument
+              body: |
+                = (
+                    $filename := soap.contentDescription.filename; 
+                    $mimeType := soap.contentData.mimeType ? soap.contentData.mimeType : soap.contentDescription.mimeType; 
+
+                    $soap := soap ~> | contentDescription | { "mimeType": $mimeType, "creationDate": $$.creationDate } |;  
+
+                    $properties := [$keys($soap.contentDescription)[$not($ in ["properties"])].{ 
+                                "PropertyTypeId": $lookup($$._global.init.mappings.toDMS,$),
+                                "Values": [$lookup($soap.contentDescription, $)] 
+                            }
+                        ] ~> $append(soap.contentDescription.properties.{ 
+                                "PropertyTypeId": $lookup($$._global.init.mappings.toDMS,key),
+                                "Values": [value] 
+                            }); 
+
+                    _defaults.templates.createDocument ~> | $ | { 
+                                "connectionId": $$._global.logon.sessionId, 
+                                "fileId": $$.fileId
+                            } |
+                        ~> | document | { 
+                            "InfoStoreId": $$._global.init.storeId,
+                            "ProtectionDomainId": $$._global.init.protectionDomainId,
+                            "ImportTemplateId": $$._global.init.importTemplateId,
+                            "Properties": $properties[$exists(PropertyTypeId)],
+                            "Name": $filename
+                            } |
+                        ~> | document.LifeCycleManager | { "LifeCycleId": $$._global.init.lifeCycleId } |
+                  )
+            transform: |
+              = {
+                  "dmsId": response.data.CreateDocumentResult.Id,
+                  "creationDate": $$.creationDate
+                }
+      supportsDelete: 
+        invoke:
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Search/Search
+              body: |
+                = (
+                    $condition := {
+                        "Values": [$$.soap.DocumentId],
+                        "ComparisonEnum": "Equals",
+                        "PlaceHolder": "",
+                        "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, "DocumentId"),
+                        "RelationEnum": "And" 
+                    }; 
+
+                    _defaults.templates.search ~> | $ | { 
+                        "connectionId": $$._global.logon.sessionId
+                    } | ~> | searchDefinition | { 
+                            "Conditions": [$condition],
+                            "PageSize": "1"
+                        } |; 
+                )
+            transform: |
+               = { "supported": $count(response.data.SearchResult.Documents[0].AccessRightsEnumList[$ = "Delete"]) > 0 }
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = $count([response.data.SearchResult.Documents]) = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+      delete: 
+        invoke: 
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Search/Search
+              body: |
+                = (
+                    $condition := {
+                        "Values": [$$.soap.DocumentId],
+                        "ComparisonEnum": "Equals",
+                        "PlaceHolder": "",
+                        "PropertyTypeId": $lookup($$._global.init.mappings.toDMS, "DocumentId"),
+                        "RelationEnum": "And" 
+                    }; 
+
+                    _defaults.templates.search ~> | $ | { 
+                        "connectionId": $$._global.logon.sessionId,
+                        "resultProperties": []
+                    } | ~> | searchDefinition | { 
+                            "Conditions": [$condition],
+                            "PageSize": "1"
+                        } |; 
+                )
+            transform: |
+              = response.data.SearchResult.Documents[0].Id
+            storeAs: docId
+            errors:
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = $count([response.data.SearchResult.Documents]) = 0
+                code: 404 
+                message: = $format("document with DocumentId %s not stored in DMS!", soap.DocumentId)
+          - request: 
+              method: post 
+              url: /InfoShare/Json/Document/DeleteDocument
+              body: |
+                = {
+                    "connectionId": _global.logon.sessionId,
+                    "documentId": docId,       
+                    "ignoreRecycleBin": true,
+                    "doNotDeletePhysicalFiles": false 
+                  }
+            transform: |
+              = { 
+                  "deleted": true 
+                }
+            errors:
+              - condition: = response.status = 400 and response.data.ErrorNumber = 10014
+                code: 403 
+                message: = $format('request failed %s/%s. no permission to delete this document (%s/%s)',response.status, response.statusText, response.data.ErrorNumber, response.data.Message)
+              - condition: = response.status >= 400 
+                code: = response.status 
+                message: = $format("request failed %s/%s. kendox error %s/%s", response.status, response.statusText, response.data.ErrorNumber, response.data.Message)

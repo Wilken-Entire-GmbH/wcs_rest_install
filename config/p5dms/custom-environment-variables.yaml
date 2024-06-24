@@ -2,13 +2,9 @@ server:
   swagger:
     enable: WDS_SWAGGERUI_ENABLE
     stats: WDS_SWAGGERSTATS
-  authorization:
-    systemPassword: WDS_SYSTEMPASSWORD
 metric:
   enabled: WDS_METRIC_ENABLE
   tenantid: WDS_TENANTID
-retrieval:
-  url: RETRIEVAL_URL
 context:
   WCS3Rest: 
     application: 
@@ -28,5 +24,6 @@ context:
       restConnector: WDSREST_CONNECTOR
     env: 
       baseURL: WDSREST_BASEURL
-      auth_bearer: WDSREST_AUTH_BEARER
-      d3_repositoryId: WDSREST_D3_REPOSITORYID
+      user: WDSREST_AUTH_USER 
+      password: WDSREST_AUTH_PASSWORD 
+      encryptPassword: WDSREST_AUTH_ENCRYPTPASSWORD

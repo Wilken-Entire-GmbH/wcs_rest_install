@@ -1,5 +1,5 @@
 definitions:
-  $id: 'http://wilken.de/p5/schemas/wcs3D3/defs'
+  $id: 'http://wilken.de/p5/schemas/wcs3Rest/defs'
   definitions:
 
     MappingColumnsConfig: 
@@ -59,8 +59,55 @@ definitions:
       additionalProperties: false 
       required: [ ]
 
+    AuthBearerOptions: 
+      type: object 
+      properties: 
+        key: { type: string }
+      required: [ key ]
+      additionalProperties: false 
+
+    AuthSessionOptions: 
+      type: object
+      properties: 
+        logonMethod: { type: string }
+        user: { type: string }
+        password: { type: string }
+        encryptPassword: { type: string }
+      required: [ logonMethod, user ]  
+      additionalProperties: false       
+      action_decrypt:
+        - encryptPassword
+        - password
+
+    AuthBasicOptions: 
+      type: object 
+      properties: 
+        user: { type: string }
+        password: { type: string }
+        encryptPassword: { type: string }
+      required: [ user ]
+      additionalProperties: false 
+      action_decrypt: 
+        - encryptPassword 
+        - password 
+
     AuthorizationConfig: 
       type: object 
+      properties: 
+        type: { type: string }
+        options: { type: object }
+      oneOf: 
+        - properties: 
+            type: { type: string, const: Bearer }
+            options: { $ref: defs#/definitions/AuthBearerOptions }
+        - properties: 
+            type: { type: string, const: Session }
+            options: { $ref: defs#/definitions/AuthSessionOptions }
+        - properties: 
+            type: { type: string, const: Basic }
+            options: { $ref: defs#/definitions/AuthBasicOptions }
+      required: [ type, options]
+      additionalProperties: false 
 
     ConnectionConfig: 
       type: object 
@@ -78,6 +125,10 @@ definitions:
               items: { $ref:  defs#/definitions/MethodConfig }
       additionalProperties: false 
       required: [ invoke ]
+    
+    GlobalMethodsConfig: 
+      type: object 
+      additionalProperties: { $ref: defs#/definitions/InvocationConfig }
 
     WcsMethodsConfig: 
       type: object
@@ -90,7 +141,7 @@ definitions:
         addContent: { $ref: defs#/definitions/InvocationConfig }
         supportsDelete: { $ref: defs#/definitions/InvocationConfig }
         delete: { $ref: defs#/definitions/InvocationConfig }
-      additionalProperties: false 
+      additionalProperties: true
       required: [ test, searchContent, getContentData, getContentDescription, updateProperties, addContent, supportsDelete, delete ]
 
     RestConnectorConfig: 
@@ -101,13 +152,9 @@ definitions:
         authorization: { $ref: defs#/definitions/AuthorizationConfig }
         connection: { $ref: defs#/definitions/ConnectionConfig }
         mappings: { $ref: defs#/definitions/MappingsConfig }
+        globalMethods: { $ref: defs#/definitions/GlobalMethodsConfig }
         wcsMethods: { $ref: defs#/definitions/WcsMethodsConfig }
-        #apiKey: { type: string }
-        #repositoryId: { type: string }
-        #mapping: { $ref: defs#/definitions/MappingConfig }
-        #methods: { $ref: defs#/definitions/MethodsConfig }
       additionalProperties: false 
-      #required: [ baseUrl, apiKey, repositoryId, mapping, methods  ]
       required: [ defaults, baseUrl, authorization, connection, mappings ]
     RestConnectorsConfig: 
       type: object 
@@ -115,7 +162,7 @@ definitions:
   
 schemas:
   ConfigFile:
-    $id: 'http://wilken.de/p5/schemas/wcs3D3/ConfigFile'
+    $id: 'http://wilken.de/p5/schemas/wcs3Rest/ConfigFile'
     $async: false
     type: object
     properties:

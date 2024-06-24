@@ -1,9 +1,9 @@
-# Windows Installation des P5DMS WCS3 To Rest Adapters
+# Windows Installation des P5DMS WCS3 To Rest Adapters für Kendox
 
 ## P5DMS WCS3 To Rest Adapter
 Der P5DMS WCS3 To Rest Adapter übersetzt WCS SOAP Aufrufe in REST Aufrufe des zugrunde liegenden DMS. Die Übersetztung nach REST ist hierbei nicht fix programmiert, sondern über eine Konfigurationsdatei parametiert. Im Prinzip lassen sich damit beliebige DMS anbinden, unter der Voraussetzung, dass ein REST Service verfügbar und alle, für die WCS3, notwendigen dokumentenbezogenen Operationen unterstützt werden. 
 
-Für D3 und das P5DMS sind Konfigurationen erstellt. Diverse andere DMS können, auf Anfrage, von der Entwicklung konfiguriert werden. 
+Für Kendox ist eine Konfiguration erstellt. Diverse andere DMS können, auf Anfrage, von der Entwicklung konfiguriert werden. 
 
 ## Installationsvoraussetzungen 
   * Zugriff auf das Internet (Herunterladen der Installation)
@@ -35,7 +35,7 @@ Verzeichnis | Beschreibung
 app\p5dms | Beinhaltet das Binary wds_contentservice_rest.exe
 config\p5dms | Beinhaltet die Konfiguration des/der Rest Services
 control | Bat Skripte zur Registrierung/Deregistrierung, Starten/Stoppen des/der Rest Service(s)
-runtime\p5dms\<tenantid> | Ablageort für Logfiles. Die Ids (tenantid) sind definiert als *prod* und *test*
+runtime\p5dms\<tenantid> | Ablageort für Logfiles. Die Ids (tenantid) sind definiert als *prod*, *test* und *entw*
 
 ## Globale Konfiguration
 Einmalig muss die IP oder der Rechnername hinterlegt werden. Diese Information wird in der WSDL für den Servicenamen verwendet.
@@ -85,7 +85,7 @@ wds_remove test
 
 Der Service wird vom Rechner entfernt und wird unter Dienste nicht mehr angezeigt. Sind alle Dienste entfernt, kann die komplette Installation von der Platte gelöscht werden.
 
-## WCS3 Rest service konfigurieren
+## WCS3 Rest Service für Kendox konfigurieren
 Der Service wird bereits vorkonfiguriert ausgeliefert. Diese Konfiguation kann nach den individuellen Bedürfnissen angepasst werden. 
 
 Die Konfigurationen der Services befindet sich unter \config\p5dms\tenants\<tenantid>.env 
@@ -93,7 +93,7 @@ Die Konfigurationen der Services befindet sich unter \config\p5dms\tenants\<tena
 Hier der ausgelieferte Inhalt von test: 
 
 ```yaml
-# P5/2 DMS WCS3 Rest Service Tenant Configuration
+# P5 DMS WCS3 Rest Service Tenant Configuration
 
 # tenant 
 TENANT_CAPTION: Test - WCS3 To REST Adapter
@@ -101,9 +101,19 @@ TENANT_CAPTION: Test - WCS3 To REST Adapter
 # http port of service
 WDSREST_HTTP_PORT: 6951
 
+# rest connector type für kendox 
+WDSREST_CONNECTOR: kendox
+
+# Die Basis URL zur Kendox REST API 
+WDSREST_BASEURL: 'http://<kendoxserver>:<kendoxport>'
+WDSREST_AUTH_USER: '<user>'
+WDSREST_AUTH_PASSWORD: '<password>'
+WDSREST_AUTH_ENCRYPTPASSWORD: '<encryptPassword>'
+
 # extend logging of soap calls
 WDSREST_SOAP_LOG: true 
-WDSRERST_SOAPCONFIG_LOG: true
+WDSREST_SOAPCONFIG_LOG: true
+
 ```
 
 Die Parameter haben folgende Bedeutung:
@@ -113,8 +123,9 @@ Parameter | Beschreibung
 WDSREST_HTTP_PORT | Legt den Port fest über den auf den Service zugegriffen wird.
 TENANT_CAPTION | Legt den Titel der Swagger UI im Browser fest. 
 WDSREST_BASEURL | BaseURL der REST API des externen DMS.
-WDSREST_AUTH_BEARER | Bearer Authentifizierung key (z.B. D3 REST).
-WDSREST_D3_REPOSITORYID | Nur D3: ID des zu verwendenden D3 Repositories.
+WDSREST_AUTH_USER | Kendox User für die Authentizifizierung.
+WDSREST_AUTH_PASSWORD | Passwort des unter WDSRET_AUTH_USER angegebenen Users 
+WDSREST_AUTH_ENCRYPTPASSWORD | Alternativ zu WDSREST_AUTH_USER das über den Adapter verschlüsselte Password
 WDSREST_SOAP_LOG | Erweitertes SOAP Logging Contentservice an/aus.
 WDSREST_SOAPCONFIG_LOG | Erweitertes SOAP Logging ContentConfiguration Service an/aus.
 

@@ -22,11 +22,6 @@ server:
   authorization:
     enable: false
     certAuth: false
-    systemPassword: f7bfd3b813d09aa8b62ff49d3094adaa7187da2b79f1bd6c7d5b4663ed962d6d
-    login: 
-      - auth: basic 
-    access:
-      auth: basic
   bindProtocol: ['http']
 metric: 
   enabled: true 
@@ -49,8 +44,6 @@ context:
         log: false
     propertyStore:
       path: ./store.json
-    wcsData:
-      location: backend.wcs
     viewer:
       serverURL: null
       forwardURL: null
@@ -58,8 +51,9 @@ context:
       file: wcs3rest/config.yaml
       restConnector: none
     env: 
-      baseUrl: ''
-      auth_bearer: ''
-      d3_repositoryId: ''
+      baseURL: ''
+      user: ''
+      password: ''
+      encryptPassword: ''
     metric: 
       subtitle: 'Content Service Rest'
