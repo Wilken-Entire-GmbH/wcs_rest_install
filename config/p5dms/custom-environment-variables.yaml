@@ -22,6 +22,8 @@ context:
       soapConfig:
         url: WDSREST_SOAPCONFIG_URL 
         log: WDSREST_SOAPCONFIG_LOG
+    viewer:
+      buildViewerUrl: WDSREST_BUILD_VIEWER_URL
     propertyStore: 
       path: WDSREST_PROPERTYSTORE_PATH
     config:

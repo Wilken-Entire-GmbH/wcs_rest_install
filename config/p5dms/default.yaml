@@ -54,12 +54,14 @@ context:
     viewer:
       serverURL: null
       forwardURL: null
+      buildViewerUrl: true
     config: 
       file: wcs3rest/config.yaml
       restConnector: none
     env: 
       baseUrl: ''
-      auth_bearer: ''
-      d3_repositoryId: ''
+      user: ''
+      password: ''
+      encryptPassword: ''
     metric: 
       subtitle: 'Content Service Rest'

@@ -1,0 +1,309 @@
+Connectors:
+  enaio:
+    defaults:
+      # WC3 Operators to ENAIO operators translation
+      operators:
+        '~': like
+        '=': eq
+        l: lte
+        g: gte
+        '>': gt
+        '!': ne
+        'i': in
+      toDMS:
+        'dmsId': 'system:objectId'
+        'Belegdatum': 'gp_er_datum'
+        'Belegnummer': 'gp_er_rechnungsnr'
+        'creationDate': 'system:creationDate'
+        'creationuser': 'system:createdBy'
+        'DocumentId': 'gp_er_objid'
+        'FachobjektId': 'gp_er_doc_no'
+        'filename': 'fileName'
+        #'KMW': 'gp_er_mandant'
+        'mimeType': 'mimeType'
+        'Dokumentenart': 'gp_er_belegart'
+      fromDMS:
+        'system:objectId': 'dmsId'
+        'gp_er_datum': 'Belegdatum'
+        'gp_er_rechnungsnr': 'Belegnummer'
+        'system:creationDate': 'creationDate'
+        'system:createdBy': 'creationuser'
+        'gp_er_objid': 'DocumentId'
+        'gp_er_doc_no': 'FachobjektId'
+        'fileName': 'filename'
+        #'gp_er_mandant': 'KMW'
+        'mimeType': 'mimeType'
+        'gp_er_belegart': 'Dokumentenart'
+      mappingMandant:
+        '': '__'
+        'MUS': 'M8'
+        '001': '00'
+        '002': '01'
+        '003': '02'
+        '009': '03'
+        '010': '04'
+        '011': '05'
+        '020': '06'
+        '022': '07'
+        '030': '08'
+        '031': '09'
+        '032': '0A'
+        '033': '0B'
+        '034': '0C'
+        '035': '0D'
+        '036': '0E'
+        '037': '0F'
+        '039': '0G'
+        '041': '0H'
+        '600': '0I'
+        '901': '0J'
+        '902': '0K'
+        '300': '0L'
+    baseUrl: ${config.env.baseURL}
+    authorization:
+      type: Basic
+      options:
+        user: ${config.env.user} # APIUSER
+        # password:
+        encryptPassword: ${config.env.encryptPassword}
+    connection:
+      type: enaio
+      options: {}
+    mappings: {}
+    globalMethods: {}
+    wcsMethods:
+      test:
+        invoke:
+          request:
+            url: /info
+          transform: |
+            =
+            (
+                $format("Success: productLine %s, systemVersion: %s, dmsVersion: %s", response.data.info.productLine, response.data.info.systemVersion, response.data.info.dmsVersion);
+            )
+
+      searchContent:
+        invoke:
+          request:
+            #url: = ( $format("/objects/%s", doc.id); )
+            url: |
+                =
+                (
+                    $id := $count(soap.query.property[key = "FachobjektId"]) > 0 ?
+                        soap.query.property[key = "FachobjektId"].value
+                        : $count(soap.query.property[key = "DocumentId"]) > 0 ?
+                        soap.query.property[key = "DocumentId"].value;
+
+                    $matcher := /(.{1})\/(.{1,5})\/(.{1,3})\/(.*)\/(.*)\//i;
+
+                    $id := $count($matcher($id).groups) >= 4 ? $matcher($id).groups[4] : $id;
+
+                    $format("/objects/%s", $id)
+                )
+            method: get
+          transform: |
+            =
+            (
+                $main := function($p)
+                    {(
+                        $dmsId := $lookup($$._defaults.toDMS, 'dmsId');
+                        $documentId := $lookup($$._defaults.toDMS, 'DocumentId');
+                        $creationDate := $lookup($$._defaults.toDMS, 'creationDate');
+
+
+                        $p{
+                            "DocumentId": $lookup($, $documentId).value,
+                            "dmsId": $lookup($, $dmsId).value,
+                            "creationDate": $toWCSDate($lookup($, $creationDate).value)
+                        }
+                    )};
+
+                $fileinfo := function($p)
+                    {(
+                        $fileName := $lookup($$._defaults.toDMS, 'filename');
+                        $mimeType := $lookup($$._defaults.toDMS, 'mimeType');
+
+                        $p{
+                            "filename": $lookup($, $fileName),
+                            "mimeType": $lookup($, $mimeType)
+                        }
+                    )};
+
+                $wcs := response.data.objects.(
+                    $mdoc := $main($.properties);
+                    $mfile := $fileinfo($.contentStreams[0]);
+                    $maindata := [ {"DocumentId": $mdoc.DocumentId }, {"mimeType": $mfile.mimeType}, {"filename": $mfile.filename}, {"dmsId": $mdoc.dmsId}, {"creationDate": $mdoc.creationDate}];
+
+                    $in := $;
+                    $w := $.properties;
+                    $p := { "properties": $keys($$._defaults.fromDMS)[$not( $ in $keys($maindata).$lookup($$._defaults.toDMS, $))].{ "key": $lookup($$._defaults.fromDMS, $), "value": $lookup($w, $).value }};
+                    $properties := $p.properties;
+
+                    $fobjid := $p.properties[key = "FachobjektId"].value;
+                    $matcher := /^(.{1})\/(.{1,5})\/(.{1,3})\/(.*)\/(.*)\/?$/i;
+                    $docType := $count($matcher($fobjid).groups) >= 3 ? $matcher($fobjid).groups[3] : $fobjid;
+                    $fobjidmod := $count($matcher($fobjid).groups) > 3 ? $join([$matcher($fobjid).groups[0], "/", $lookup($$._defaults.mappingMandant, $matcher($fobjid).groups[1]), "/__/", $matcher($fobjid).groups[3], "/", $matcher($fobjid).groups[4], "/" ]) : $fobjid;
+
+                    $properties := $append($properties, {"key": "docType", "value": $docType});
+                    $properties ~> | $properties[key = "FachobjektId"]|{ "value": $fobjidmod }|;
+
+                    $p := {"properties":  $properties};
+
+                    $merge([
+                        $maindata,
+                        $p
+                    ])
+                );
+
+                [$wcs]
+            )
+          errors:
+              - condition: = response.status >= 400
+                code: = 200
+                message: =  $format("%s -  document not stored in enaio DMS!", response.status)
+                result: = []
+                customErrorHandling: = true
+
+      getContentDescription:
+        invoke:
+          request:
+            url: = ( $format("/objects/%s", soap.DocumentId); )
+          transform: |
+            =
+            (
+                $wcs := response.data.objects[0];
+
+                $mainf := function($p)
+                    {(
+                        $dmsId := $lookup($$._defaults.toDMS, 'dmsId');
+                        $documentId := $lookup($$._defaults.toDMS, 'DocumentId');
+                        $creationDate := $lookup($$._defaults.toDMS, 'creationDate');
+
+                        $p{ "dmsId": $lookup($, $dmsId).value,
+                            "DocumentId": $lookup($, $documentId).value,
+                            "creationDate": $toWCSDate($lookup($, $creationDate).value)
+                        }
+                    )};
+
+                $fileinfof := function($p)
+                    {(
+                        $fileName := $lookup($$._defaults.toDMS, 'filename');
+                        $mimeType := $lookup($$._defaults.toDMS, 'mimeType');
+
+                        $p{
+                            "filename": $lookup($, $fileName),
+                            "mimeType": $lookup($, $mimeType)
+                        }
+                    )};
+
+                $main := $merge( $wcs.[ $mainf($.properties), $fileinfof($.contentStreams[0])]);
+                $w := response.data.objects[0].properties;
+                $props := $keys($$._defaults.fromDMS)[$not( $ in $keys($main).$lookup($$._defaults.toDMS, $))].{ "key": $lookup($$._defaults.fromDMS, $), "value": $lookup($w, $).value };
+
+                $fobjid := $props[key = "FachobjektId"].value;
+                $matcher := /^(.{1})\/(.{1,5})\/(.{1,3})\/(.*)\/(.*)\/?$/i;
+                $docType := $count($matcher($fobjid).groups) >= 3 ? $matcher($fobjid).groups[3] : $fobjid;
+                $fobjidmod := $count($matcher($fobjid).groups) > 3 ? $join([$matcher($fobjid).groups[0], "/", $lookup($$._defaults.mappingMandant, $matcher($fobjid).groups[1]), "/__/", $matcher($fobjid).groups[3], "/", $matcher($fobjid).groups[4], "/" ]) : $fobjid;
+
+                $props := $append($props, {"key": "docType", "value": $docType});
+                $props ~> | $props[key = "FachobjektId"]|{ "value": $fobjidmod }|;
+
+                $merge([ $main, { "properties": $props } ])
+
+            )
+          errors:
+            - condition: |
+                = $not(response.data.objects) or $count($keys(response.data.objects)) = 0 or ($count(response.data.objects) > 0 and response.data.numItems = 0)
+              code: 404
+              message: = $format("document with DocumentId %s not stored in enaio DMS!", soap.DocumentId)
+
+      getContentData:
+        invoke:
+          - request:
+              url: = ( $format("/objects/%s", soap.DocumentId); )
+            transform: |
+                =
+                (
+                    $wcs := response.data.objects[0];
+
+                    $mainf := function($p)
+                        {(
+                            $dmsId := $lookup($$._defaults.toDMS, 'dmsId');
+                            $documentId := $lookup($$._defaults.toDMS, 'DocumentId');
+                            $creationDate := $lookup($$._defaults.toDMS, 'creationDate');
+
+
+                            $p{ "dmsId": $lookup($, $dmsId).value,
+                                "DocumentId": $lookup($, $documentId).value,
+                                "creationDate": $toWCSDate($lookup($, $creationDate).value)
+                            }
+                        )};
+
+                    $fileinfof := function($p)
+                        {(
+                            $fileName := $lookup($$._defaults.toDMS, 'filename');
+                            $mimeType := $lookup($$._defaults.toDMS, 'mimeType');
+
+                            $p{
+                                "filename": $lookup($, $fileName),
+                                "mimeType": $lookup($, $mimeType)
+                            }
+                        )};
+
+                    $main := $merge( $wcs.[ $mainf($.properties), $fileinfof($.contentStreams[0])]);
+                    $w := response.data.objects[0].properties;
+                    $props := $keys($$._defaults.fromDMS)[$not( $ in $keys($main).$lookup($$._defaults.toDMS, $))].{ "key": $lookup($$._defaults.fromDMS, $), "value": $lookup($w, $).value };
+
+                    $merge([ $main, { "properties": $props } ])
+
+                )
+            storeAs: doc
+            errors:
+                - condition: |
+                    = $not(response.data.objects) or $count($keys(response.data.objects)) = 0 or ($count(response.data.objects) > 0 and response.data.numItems = 0)
+                  code: 404
+                  message: = $format("document with DocumentId %s not stored in enaio DMS!", soap.DocumentId)
+          - request:
+              #url: = ( $format("/objects/%s", doc.id); )
+              url: = ( $format("/objects/%s/contents/file", soap.DocumentId); )
+              options:
+                responseType: buffer
+            transform:
+              contentType: = doc.mimeType
+              buffer: = response.data
+
+      updateProperties:
+        invoke:
+          transform: |
+            = $debug({ "_defaults": _defaults, "soap": soap })
+          errors:
+            - condition: = 1 = 1
+              code: 501
+              message: = "Not implemented feature"
+
+      addContent:
+        invoke:
+          transform: |
+            = $debug({ "_defaults": _defaults, "soap": soap })
+          errors:
+            - condition: = 1 = 1
+              code: 501
+              message: = "Not implemented feature"
+
+      supportsDelete:
+        invoke:
+          transform: |
+            = $debug({ "_defaults": _defaults, "soap": soap })
+          errors:
+            - condition: = 1 = 1
+              code: 501
+              message: = "Not implemented feature"
+
+      delete:
+        invoke:
+          transform: |
+            = $debug({ "_defaults": _defaults, "soap": soap })
+          errors:
+            - condition: = 1 = 1
+              code: 501
+              message: = "Not implemented feature"

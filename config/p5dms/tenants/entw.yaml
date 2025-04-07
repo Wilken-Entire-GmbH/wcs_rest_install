@@ -1,15 +1,18 @@
-# P5/2 DMS WCS3 Mockservice Tenant Configuration
+# P5 DMS WCS3 Restservice Tenant Configuration
 
 # tenant 
-TENANT_CAPTION: Entw - WCS3 To REST Adapter
+TENANT_CAPTION: Development - WCS3 To REST Adapter
 
 # http port of service
 WDSREST_HTTP_PORT: 6952
 
 # rest connector type 
-WDSREST_CONNECTOR: '??????'
-WDSREST_BASEURL: '?????????????'
+WDSREST_CONNECTOR: <connector>
+WDSREST_BASEURL: 'https://<server>:<port>'
+WDSREST_AUTH_BEARER: <bearertoken>
+WDSREST_D3_REPOSITORYID: <repositoryid>
 
 # extend logging of soap calls
 WDSREST_SOAP_LOG: true 
 WDSREST_SOAPCONFIG_LOG: true
+WDSREST_BUILD_VIEWER_URL: true

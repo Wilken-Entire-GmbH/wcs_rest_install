@@ -14,3 +14,4 @@ WDSREST_BEARER: ''
 # extend logging of soap calls
 WDSREST_SOAP_LOG: true 
 WDSREST_SOAPCONFIG_LOG: true
+WDSREST_BUILD_VIEWER_URL: true
